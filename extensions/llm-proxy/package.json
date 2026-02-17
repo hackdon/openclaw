@@ -1,0 +1,14 @@
+{
+  "name": "@openclaw/llm-proxy",
+  "version": "0.1.0",
+  "description": "Lightweight OpenAI-compatible LLM proxy without agent overhead",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
