@@ -6,6 +6,7 @@ import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../src/agents/defaults.js";
 import { getApiKeyForModel, requireApiKey } from "../../src/agents/model-auth.js";
 import { resolveConfiguredModelRef } from "../../src/agents/model-selection.js";
 import { resolveModel } from "../../src/agents/pi-embedded-runner/model.js";
+import { DEFAULT_AGENT_ID } from "../../src/routing/session-key.js";
 import { resolveGatewayAuth } from "../../src/gateway/auth.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -90,7 +91,7 @@ const llmProxyPlugin = {
   }) {
     api.registerHttpHandler(async (req, res) => {
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-      if (url.pathname !== "/llm/v1/chat/completions") return false;
+      if (url.pathname !== "/openai/v1/chat/completions") return false;
 
       if (req.method !== "POST") {
         sendJson(res, 405, {
@@ -182,7 +183,7 @@ const llmProxyPlugin = {
         defaultRef.provider,
         defaultRef.model,
       );
-      const agentDir = resolveAgentDir(cfg as Parameters<typeof resolveAgentDir>[0], "default");
+      const agentDir = resolveAgentDir(cfg as Parameters<typeof resolveAgentDir>[0], DEFAULT_AGENT_ID);
       const resolved2 = resolveModel(
         provider,
         modelId,
