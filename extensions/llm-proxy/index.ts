@@ -143,16 +143,8 @@ const llmProxyPlugin = {
         return true;
       }
 
-      // Prepend system prompt to the first user message if present.
-      if (systemParts.length > 0 && contextMessages.length > 0) {
-        const systemPrompt = systemParts.join("\n\n");
-        const first = contextMessages[0]!;
-        if (first.role === "user") {
-          first.content = `${systemPrompt}\n\n${first.content}`;
-        } else {
-          contextMessages.unshift({ role: "user", content: systemPrompt, timestamp: Date.now() });
-        }
-      }
+      // Build system prompt for the LLM context (required by some providers like openai-codex).
+      const systemPrompt = systemParts.length > 0 ? systemParts.join("\n\n") : "You are a helpful assistant.";
 
       // Resolve model.
       const defaultRef = resolveConfiguredModelRef({
@@ -184,13 +176,24 @@ const llmProxyPlugin = {
       try {
         const llmResult = await completeSimple(
           resolved2.model,
-          { messages: contextMessages },
+          { messages: contextMessages, systemPrompt },
           {
             apiKey,
             maxTokens: typeof body.max_tokens === "number" ? body.max_tokens : 4096,
             ...(typeof body.temperature === "number" ? { temperature: body.temperature } : {}),
           },
         );
+
+        // Check if the LLM call failed (completeSimple resolves instead of rejecting on error)
+        if (llmResult.stopReason === "error") {
+          sendJson(res, 502, {
+            error: {
+              message: (llmResult as any).errorMessage || "LLM call failed",
+              type: "upstream_error",
+            },
+          });
+          return true;
+        }
 
         const content = llmResult.content
           .filter(isTextBlock)
