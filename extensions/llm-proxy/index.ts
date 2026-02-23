@@ -1,11 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { completeSimple, type TextContent } from "@mariozechner/pi-ai";
 import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
-import { resolveModel } from "../../src/agents/pi-embedded-runner/model.js";
-import { getApiKeyForModel, requireApiKey } from "../../src/agents/model-auth.js";
-import { resolveConfiguredModelRef } from "../../src/agents/model-selection.js";
 import { resolveAgentDir } from "../../src/agents/agent-scope.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../src/agents/defaults.js";
+import { getApiKeyForModel, requireApiKey } from "../../src/agents/model-auth.js";
+import { resolveConfiguredModelRef } from "../../src/agents/model-selection.js";
+import { resolveModel } from "../../src/agents/pi-embedded-runner/model.js";
 import { resolveGatewayAuth } from "../../src/gateway/auth.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -82,13 +82,20 @@ const llmProxyPlugin = {
   name: "LLM Proxy",
   description: "Lightweight OpenAI-compatible LLM proxy without agent overhead",
   configSchema: emptyPluginConfigSchema(),
-  register(api: { runtime: { config: { loadConfig: () => Record<string, unknown> } }; registerHttpHandler: (handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>) => void }) {
+  register(api: {
+    runtime: { config: { loadConfig: () => Record<string, unknown> } };
+    registerHttpHandler: (
+      handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>,
+    ) => void;
+  }) {
     api.registerHttpHandler(async (req, res) => {
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
       if (url.pathname !== "/llm/v1/chat/completions") return false;
 
       if (req.method !== "POST") {
-        sendJson(res, 405, { error: { message: "Method Not Allowed", type: "invalid_request_error" } });
+        sendJson(res, 405, {
+          error: { message: "Method Not Allowed", type: "invalid_request_error" },
+        });
         return true;
       }
 
@@ -96,7 +103,9 @@ const llmProxyPlugin = {
       const cfg = api.runtime.config.loadConfig() as Record<string, unknown>;
       const gatewayConfig = cfg.gateway as Record<string, unknown> | undefined;
       const authConfig = gatewayConfig?.auth as Record<string, unknown> | undefined;
-      const resolved = resolveGatewayAuth({ authConfig: authConfig as Parameters<typeof resolveGatewayAuth>[0]["authConfig"] });
+      const resolved = resolveGatewayAuth({
+        authConfig: authConfig as Parameters<typeof resolveGatewayAuth>[0]["authConfig"],
+      });
       const expectedSecret = resolved.token ?? resolved.password;
       const reqToken = getBearerToken(req);
 
@@ -111,19 +120,31 @@ const llmProxyPlugin = {
         const raw = await readBody(req, MAX_BODY_BYTES);
         body = JSON.parse(raw) as Record<string, unknown>;
       } catch {
-        sendJson(res, 400, { error: { message: "Invalid JSON body", type: "invalid_request_error" } });
+        sendJson(res, 400, {
+          error: { message: "Invalid JSON body", type: "invalid_request_error" },
+        });
         return true;
       }
 
       if (body.stream) {
-        sendJson(res, 400, { error: { message: "Streaming is not supported by llm-proxy. Use the agent endpoint /v1/chat/completions for streaming.", type: "invalid_request_error" } });
+        sendJson(res, 400, {
+          error: {
+            message:
+              "Streaming is not supported by llm-proxy. Use the agent endpoint /v1/chat/completions for streaming.",
+            type: "invalid_request_error",
+          },
+        });
         return true;
       }
 
       // Extract messages.
       const messages = Array.isArray(body.messages) ? (body.messages as ChatMessage[]) : [];
       const systemParts: string[] = [];
-      const contextMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
+      const contextMessages: Array<{
+        role: "user" | "assistant";
+        content: string;
+        timestamp: number;
+      }> = [];
 
       for (const msg of messages) {
         const role = typeof msg.role === "string" ? msg.role.trim() : "";
@@ -139,12 +160,15 @@ const llmProxyPlugin = {
       }
 
       if (contextMessages.length === 0) {
-        sendJson(res, 400, { error: { message: "No user message in `messages`.", type: "invalid_request_error" } });
+        sendJson(res, 400, {
+          error: { message: "No user message in `messages`.", type: "invalid_request_error" },
+        });
         return true;
       }
 
       // Build system prompt for the LLM context (required by some providers like openai-codex).
-      const systemPrompt = systemParts.length > 0 ? systemParts.join("\n\n") : "You are a helpful assistant.";
+      const systemPrompt =
+        systemParts.length > 0 ? systemParts.join("\n\n") : "You are a helpful assistant.";
 
       // Resolve model.
       const defaultRef = resolveConfiguredModelRef({
@@ -153,14 +177,25 @@ const llmProxyPlugin = {
         defaultModel: DEFAULT_MODEL,
       });
       const requestModel = typeof body.model === "string" ? body.model : undefined;
-      const { provider, model: modelId } = parseModelRef(requestModel, defaultRef.provider, defaultRef.model);
-      const agentDir = resolveAgentDir(
-        cfg as Parameters<typeof resolveAgentDir>[0],
-        "default",
+      const { provider, model: modelId } = parseModelRef(
+        requestModel,
+        defaultRef.provider,
+        defaultRef.model,
       );
-      const resolved2 = resolveModel(provider, modelId, agentDir, cfg as Parameters<typeof resolveModel>[3]);
+      const agentDir = resolveAgentDir(cfg as Parameters<typeof resolveAgentDir>[0], "default");
+      const resolved2 = resolveModel(
+        provider,
+        modelId,
+        agentDir,
+        cfg as Parameters<typeof resolveModel>[3],
+      );
       if (!resolved2.model) {
-        sendJson(res, 400, { error: { message: resolved2.error ?? `Unknown model: ${provider}/${modelId}`, type: "invalid_request_error" } });
+        sendJson(res, 400, {
+          error: {
+            message: resolved2.error ?? `Unknown model: ${provider}/${modelId}`,
+            type: "invalid_request_error",
+          },
+        });
         return true;
       }
 
