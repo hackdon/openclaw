@@ -1,0 +1,10 @@
+{
+  "id": "llm-proxy",
+  "name": "LLM Proxy",
+  "description": "Lightweight OpenAI-compatible LLM proxy without agent overhead",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
